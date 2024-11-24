@@ -1,4 +1,4 @@
 #!/bin/bash
 
 # Docker build
-docker build -t rebin-backend-image .
+docker build -t voice-server-image .

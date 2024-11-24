@@ -17,15 +17,15 @@ model = whisper.load_model("base")
 app = Flask(__name__)
 
 # Response endpoint
-@app.route('/response', methods=['POST'])
+@app.route('/voice-chat', methods=['POST'])
 def response():
     try:
         # Get body out of request
+        print("Recieved voice-chat Request")
         body = request.get_json()
         context_id = body.get('context_id')
         base64_audio = body.get('audio')
-
-        print(f"Session ID: {context_id}")
+        auth_token = request.headers.get("Authorization")
 
         # Check if required fields are present
         if not context_id:
@@ -41,47 +41,52 @@ def response():
             temp_audio_file.write(audio_data)
             temp_audio_path = temp_audio_file.name
 
-        print(f"Audio saved to: {temp_audio_path}")
-
         # Get transcription from Whisper model
         transcription_result = model.transcribe(temp_audio_path)
         transcription = transcription_result.get("text", "No transcription available")
         print(f"Transcription: {transcription}")
 
         # Make API call to Ajentify
-        response = requests.post("https://api.ajentify.com/chat", json={
-            "context_id": context_id,
-            "message": transcription
-        })
-        llm_response = response.json().get("response", "No response from Ajentify")
+        response = requests.post(
+            "https://api.ajentify.com/chat", 
+            headers = {
+                "Authorization": auth_token
+            },
+            json = {
+                "context_id": context_id,
+                "message": transcription
+            }
+        )
+        if response.status_code != 200:
+            raise Exception(f"Ajentify Chat API error: {response.status_code} {response.text}")
+        agent_response = response.json().get("response", "No response from Ajentify")
+        print(f"Response from agent: {agent_response}")
 
         # Call ElevenLabs API for text-to-speech
-        CHUNK_SIZE = 1024
-        url = "https://api.elevenlabs.io/v1/text-to-speech/IKne3meq5aSn9XLyUdCD"
-
-        headers = {
-            "Accept": "audio/mpeg",
-            "Content-Type": "application/json",
-            "xi-api-key": os.getenv('ELEVENLABS_API_KEY')
-        }
-
-        data = {
-            "text": llm_response,
-            "model_id": "eleven_monolingual_v1",
-            "voice_settings": {
-                "stability": 0.5,
-                "similarity_boost": 0.5
-            }
-        }
-
-        response = requests.post(url, json=data, headers=headers, stream=True)
-
+        voice_id = "IKne3meq5aSn9XLyUdCD"
+        response = requests.post(
+            f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
+            headers = {
+                "Accept": "audio/mpeg",
+                "Content-Type": "application/json",
+                "xi-api-key": os.getenv('ELEVENLABS_API_KEY')
+            },
+            json = {
+                "text": agent_response,
+                "model_id": "eleven_monolingual_v1",
+                "voice_settings": {
+                    "stability": 0.5,
+                    "similarity_boost": 0.5
+                }
+            },
+            stream=True
+        )
         if response.status_code != 200:
             raise Exception(f"ElevenLabs API error: {response.status_code} {response.text}")
-        
         print("Got response back from ElevenLabs API")
 
         # Save TTS response to a temporary file
+        CHUNK_SIZE = 1024
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as output_audio_file:
             for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
                 if chunk:
@@ -96,6 +101,7 @@ def response():
         return jsonify({
             "context_id": context_id,
             "transcription": transcription,
+            "agent_response": agent_response,
             "audio_base64": encoded_audio
         })
 

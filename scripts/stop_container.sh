@@ -1,5 +1,5 @@
 #!/bin/bash
 
 
-docker stop rebin-backend-container
-docker rm rebin-backend-container
+docker stop voice-server-container
+docker rm voice-server-container
