@@ -29,9 +29,9 @@ def response():
 
         # Check if required fields are present
         if not context_id:
-            raise Exception("context_id field is required")
+            raise Exception("context_id field must be provided")
         if not base64_audio:
-            raise Exception("audio field is required")
+            raise Exception("audio field must be provided")
 
         # Decode base64 audio
         audio_data = base64.b64decode(base64_audio)
