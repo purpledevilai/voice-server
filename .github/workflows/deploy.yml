@@ -19,11 +19,15 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Install Copilot
+      - name: Ensure Copilot is installed
         run: |
-          curl -Lo copilot https://github.com/aws/copilot-cli/releases/latest/download/copilot-linux
-          chmod +x copilot
-          sudo mv copilot /usr/local/bin/copilot
+          if ! command -v copilot &> /dev/null; then
+            echo "Installing AWS Copilot..."
+            curl -Lo copilot-cli https://github.com/aws/copilot-cli/releases/latest/download/copilot-linux
+            chmod +x copilot-cli
+            sudo mv copilot-cli /usr/local/bin/copilot
+          fi
+          copilot --version
 
       - name: Deploy with Copilot
         env:
